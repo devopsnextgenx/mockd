@@ -51,10 +51,43 @@ class NodeGraphEditor(QMainWindow):
         # Create splitter for resizable panels
         splitter = QSplitter(Qt.Horizontal)
 
-        # Left panel - Node palette
+        # --- Left panel layout ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+
+        # Execute button (easy access)
+        self.execute_button = QPushButton("▶ Execute Pipeline")
+        self.execute_button.setStyleSheet(
+            """
+            QPushButton {
+                font-weight: bold;
+                background: #c0392b;   /* Red background */
+                color: white;
+                border: 1px solid #b52a1c;
+                border-radius: 4px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover {
+                background: #e74c3c;
+            }
+            QPushButton:pressed {
+                background: #922b21;
+            }
+            """
+        )
+        self.execute_button.clicked.connect(self.execute_pipeline)
+        left_layout.addWidget(self.execute_button)
+
+        # Node palette
         self.node_palette = NodePalette()
         self.node_palette.setMaximumWidth(250)
-        splitter.addWidget(self.node_palette)
+        left_layout.addWidget(self.node_palette)
+
+        left_panel.setMaximumWidth(250)
+        splitter.addWidget(left_panel)
+        # --- End left panel ---
 
         # Center - Node graph view
         self.scene = NodeGraphScene(self.pipeline)
