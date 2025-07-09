@@ -1,0 +1,12 @@
+[project]
+name = "mockd"
+version = "0.1.0"
+description = "Node Graph Pipeline Editor - A GUI application for creating data processing pipelines"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.6.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "Pillow>=10.0.0"
+]

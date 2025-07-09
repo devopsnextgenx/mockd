@@ -1,0 +1,13 @@
+[
+  {
+    "name": "MultiplyByN",
+    "inputs": [
+      {"name": "value", "type": "float or list"},
+      {"name": "factor", "type": "float"}
+    ],
+    "outputs": [
+      {"name": "result", "type": "float or list"}
+    ],
+    "logic": "f = factor[0] if isinstance(factor, list) else factor; result = [v * f for v in value] if isinstance(value, list) else value * f"
+  }
+]

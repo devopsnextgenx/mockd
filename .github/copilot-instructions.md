@@ -1,0 +1,1 @@
+vs code is setup to bash shell, please use bash commands instead of windows commands.

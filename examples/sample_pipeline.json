@@ -1,0 +1,99 @@
+{
+  "name": "Example Data Processing Pipeline",
+  "nodes": [
+    {
+      "id": "data-input-1",
+      "type": "data",
+      "name": "Input Numbers",
+      "position": [100, 100],
+      "data": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    },
+    {
+      "id": "transform-square",
+      "type": "transform_square",
+      "name": "Square Transform",
+      "position": [300, 50]
+    },
+    {
+      "id": "filter-even",
+      "type": "filter",
+      "name": "Filter Even",
+      "position": [300, 150]
+    },
+    {
+      "id": "aggregate-sum-squares",
+      "type": "aggregate_sum",
+      "name": "Sum of Squares",
+      "position": [500, 50]
+    },
+    {
+      "id": "aggregate-mean-evens",
+      "type": "aggregate_mean",
+      "name": "Mean of Evens",
+      "position": [500, 150]
+    },
+    {
+      "id": "math-divide",
+      "type": "math_divide",
+      "name": "Ratio Calculator",
+      "position": [700, 100]
+    },
+    {
+      "id": "print-result",
+      "type": "print",
+      "name": "Final Result",
+      "position": [900, 100]
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-1",
+      "source_node": "data-input-1",
+      "source_port": "output",
+      "target_node": "transform-square",
+      "target_port": "data"
+    },
+    {
+      "id": "conn-2",
+      "source_node": "data-input-1",
+      "source_port": "output",
+      "target_node": "filter-even",
+      "target_port": "data"
+    },
+    {
+      "id": "conn-3",
+      "source_node": "transform-square",
+      "source_port": "transformed_data",
+      "target_node": "aggregate-sum-squares",
+      "target_port": "data"
+    },
+    {
+      "id": "conn-4",
+      "source_node": "filter-even",
+      "source_port": "filtered_data",
+      "target_node": "aggregate-mean-evens",
+      "target_port": "data"
+    },
+    {
+      "id": "conn-5",
+      "source_node": "aggregate-sum-squares",
+      "source_port": "result",
+      "target_node": "math-divide",
+      "target_port": "a"
+    },
+    {
+      "id": "conn-6",
+      "source_node": "aggregate-mean-evens",
+      "source_port": "result",
+      "target_node": "math-divide",
+      "target_port": "b"
+    },
+    {
+      "id": "conn-7",
+      "source_node": "math-divide",
+      "source_port": "result",
+      "target_node": "print-result",
+      "target_port": "data"
+    }
+  ]
+}
