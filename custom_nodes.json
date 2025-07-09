@@ -1,13 +1,34 @@
-[
-  {
+{
+  "MultiplyByN": {
     "name": "MultiplyByN",
     "inputs": [
-      {"name": "value", "type": "float or list"},
-      {"name": "factor", "type": "float"}
+      {
+        "name": "value",
+        "type": "float or list"
+      },
+      {
+        "name": "factor",
+        "type": "float"
+      }
     ],
     "outputs": [
-      {"name": "result", "type": "float or list"}
+      {
+        "name": "result",
+        "type": "float or list"
+      }
     ],
     "logic": "f = factor[0] if isinstance(factor, list) else factor; result = [v * f for v in value] if isinstance(value, list) else value * f"
+  },
+  "user": {
+    "inputs": [
+      "firstName",
+      "lastName"
+    ],
+    "logic": "def execute(self, inputs):\n    fullName = inputs.get('firstName', '') + ' ' + inputs.get('lastName', '')\n    userName = inputs.get('firstName', '')+ inputs.get('lastName', '')\n    return {\n        'fullName': fullName,\n        'userName': userName\n    }",
+    "name": "user",
+    "outputs": [
+      "fullName",
+      "userName"
+    ]
   }
-]
+}

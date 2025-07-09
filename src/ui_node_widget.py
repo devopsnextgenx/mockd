@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsTextItem, QGraphicsProxyWidget, QLineEdit, QGraphicsItem
+from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsTextItem, QGraphicsProxyWidget, QLineEdit, QGraphicsItem, QGraphicsWidget, QPushButton
 from PySide6.QtGui import QBrush, QColor, QPen, QFont
 from PySide6.QtCore import Qt, QObject
 from typing import Dict
@@ -229,3 +229,63 @@ class NodeWidget(QObject, QGraphicsRectItem):
     def hoverLeaveEvent(self, event):
         self.setPen(self._default_pen)
         super().hoverLeaveEvent(event)
+
+class NodeWidget(QGraphicsWidget):
+    """Visual representation of a process node"""
+    def __init__(self, process_node):
+        super().__init__()
+        self.process_node = process_node
+        self.input_ports = {}
+        self.output_ports = {}
+        self.is_editing_name = False
+        
+        # Check if it's a custom node
+        self.is_custom = hasattr(process_node, 'is_custom_node')
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        # ...existing setup code...
+        
+        # Add custom node controls if applicable
+        if self.is_custom:
+            self.add_custom_node_controls()
+    
+    def add_custom_node_controls(self):
+        """Add controls for custom nodes"""
+        # Edit button
+        edit_btn = QPushButton("Edit")
+        edit_btn.setMaximumSize(40, 20)
+        edit_btn.clicked.connect(self.edit_custom_node)
+        
+        # Add to layout (you'll need to adjust based on your existing layout)
+        # This would go in your node's control area
+    
+    def edit_custom_node(self):
+        """Open custom node editor"""
+        from .custom_node_dialog import CustomNodeDialog
+        
+        dialog = CustomNodeDialog(None, self.process_node.definition)
+        dialog.node_created.connect(self.update_custom_node)
+        dialog.exec()
+    
+    def update_custom_node(self, name, definition):
+        """Update the custom node"""
+        self.process_node.update_definition(definition)
+        self.update_from_definition()
+    
+    def update_from_definition(self):
+        """Update the visual representation from the node definition"""
+        if self.is_custom:
+            # Clear existing ports
+            for port in list(self.input_ports.values()) + list(self.output_ports.values()):
+                self.scene().removeItem(port)
+            
+            self.input_ports.clear()
+            self.output_ports.clear()
+            
+            # Recreate ports based on new definition
+            self.create_ports()
+            self.update_layout()
+    
+    # ...existing code...

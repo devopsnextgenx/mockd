@@ -5,7 +5,8 @@ from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QApplication,
                               QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
                               QPushButton, QListWidget, QSplitter, QMenuBar,
                               QMenu, QToolBar, QStatusBar, QGraphicsProxyWidget,
-                              QLineEdit, QLabel, QFrame, QTreeWidget, QTreeWidgetItem)
+                              QLineEdit, QLabel, QFrame, QTreeWidget, QTreeWidgetItem,
+                              QMessageBox, QFileDialog, QDialog)
 from PySide6.QtCore import Qt, QPointF, QRectF, Signal, QTimer, QObject, QEvent
 from PySide6.QtGui import QPen, QBrush, QColor, QPainter, QFont, QAction, QPainterPath
 from typing import Dict, List, Optional, Tuple
@@ -16,6 +17,12 @@ from src.nodes import NODE_TYPES, create_node, get_all_node_types
 from .ui_node_port import NodePort
 from .ui_connection_widget import ConnectionWidget
 from .ui_node_widget import NodeWidget
+
+# Only import if the file exists, otherwise we'll create it
+try:
+    from .custom_node_dialog import CustomNodeDialog
+except ImportError:
+    CustomNodeDialog = None
 
 
 class NodeGraphScene(QGraphicsScene):
@@ -40,20 +47,40 @@ class NodeGraphScene(QGraphicsScene):
     def add_node(self, node_type: str, position: Tuple[float, float] = (0, 0)) -> str:
         """Add a new node to the scene"""
         try:
-            process_node = create_node(node_type)
-            process_node.position = position
-            
-            # Add to pipeline
-            node_id = self.pipeline.add_node(process_node)
-            
-            # Create visual representation
-            node_widget = NodeWidget(process_node)
-            node_widget.setPos(position[0], position[1])
-            self.addItem(node_widget)
-            self.node_widgets[node_id] = node_widget
-            
-            self.node_added.emit(node_id)
-            return node_id
+            if node_type == "custom":
+                return self.add_custom_node(position)
+            elif node_type.startswith("custom_"):
+                # Handle existing custom node types
+                from .custom_nodes import custom_node_manager
+                custom_node = custom_node_manager.create_custom_node(node_type)
+                custom_node.position = position
+                
+                # Add to pipeline
+                node_id = self.pipeline.add_node(custom_node)
+                
+                # Create visual representation
+                node_widget = NodeWidget(custom_node)
+                node_widget.setPos(position[0], position[1])
+                self.addItem(node_widget)
+                self.node_widgets[node_id] = node_widget
+                
+                self.node_added.emit(node_id)
+                return node_id
+            else:
+                process_node = create_node(node_type)
+                process_node.position = position
+                
+                # Add to pipeline
+                node_id = self.pipeline.add_node(process_node)
+                
+                # Create visual representation
+                node_widget = NodeWidget(process_node)
+                node_widget.setPos(position[0], position[1])
+                self.addItem(node_widget)
+                self.node_widgets[node_id] = node_widget
+                
+                self.node_added.emit(node_id)
+                return node_id
         except Exception as e:
             print(f"Failed to create node: {e}")
             return ""
@@ -168,6 +195,53 @@ class NodeGraphScene(QGraphicsScene):
                             break
             return  # Prevent base class from interfering with deletion
         super().keyPressEvent(event)
+    
+    def add_custom_node(self, position: Tuple[float, float] = (0, 0)) -> str:
+        """Add a new custom node to the scene"""
+        if CustomNodeDialog is None:
+            QMessageBox.warning(None, "Error", "Custom node dialog not available. Please create custom_node_dialog.py first.")
+            return ""
+            
+        dialog = CustomNodeDialog(self.parent())
+        dialog.node_created.connect(self.on_custom_node_created)
+        
+        if dialog.exec() == QDialog.Accepted:
+            # The node will be created via the signal
+            pass
+        
+        return ""
+    
+    def on_custom_node_created(self, node_name: str, definition: dict):
+        """Handle custom node creation"""
+        try:
+            # Save the custom node definition
+            from .custom_nodes import custom_node_manager
+            custom_node_manager.save_custom_node(node_name, definition)
+            
+            # Create a custom node instance
+            from .custom_nodes import CustomNode
+            custom_node = CustomNode(definition)
+            custom_node.position = (100, 100)
+            
+            # Add to pipeline
+            node_id = self.pipeline.add_node(custom_node)
+            
+            # Create visual representation
+            node_widget = NodeWidget(custom_node)
+            node_widget.setPos(100, 100)
+            self.addItem(node_widget)
+            self.node_widgets[node_id] = node_widget
+            
+            self.node_added.emit(node_id)
+            
+            # Refresh the node palette to show the new custom node
+            if hasattr(self.parent(), 'refresh_node_palette'):
+                self.parent().refresh_node_palette()
+            
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Failed to create custom node: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 class NodeGraphView(QGraphicsView):
@@ -225,9 +299,55 @@ class NodePalette(QWidget):
         title.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
         layout.addWidget(title)
         
+        # Custom node button
+        create_custom_btn = QPushButton("Create Custom Node")
+        create_custom_btn.clicked.connect(self.create_custom_node)
+        create_custom_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        layout.addWidget(create_custom_btn)
+        
+        # Refresh button
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh_palette)
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 4px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        layout.addWidget(refresh_btn)
+        
         # Node categories
         self.node_tree = QTreeWidget()
         self.node_tree.setHeaderHidden(True)
+        
+        self.populate_node_tree()
+        
+        self.node_tree.expandAll()
+        self.node_tree.itemDoubleClicked.connect(self.on_node_double_clicked)
+        
+        layout.addWidget(self.node_tree)
+    
+    def populate_node_tree(self):
+        """Populate the node tree with all available nodes"""
+        self.node_tree.clear()
         
         # Populate with available node types
         categories = {
@@ -308,23 +428,29 @@ class NodePalette(QWidget):
             self.node_tree.addTopLevelItem(category_item)
         
         # Add Custom Nodes category
-        all_node_types = get_all_node_types()
-        custom_node_types = [k for k in all_node_types.keys() if k not in sum(
-            [v if isinstance(v, list) else sum(v.values(), []) for v in categories.values()], []
-        )]
-        if custom_node_types:
-            custom_category_item = QTreeWidgetItem(["Custom Nodes"])
-            for node_type in custom_node_types:
-                display_name = node_type.replace("_", " ").title()
-                node_item = QTreeWidgetItem([display_name])
-                node_item.setData(0, Qt.UserRole, node_type)
-                custom_category_item.addChild(node_item)
-            self.node_tree.addTopLevelItem(custom_category_item)
-
+        self.add_custom_nodes_category()
+    
+    def add_custom_nodes_category(self):
+        """Add custom nodes to the palette"""
+        try:
+            from .custom_nodes import custom_node_manager
+            custom_node_types = custom_node_manager.get_custom_node_types()
+            
+            if custom_node_types:
+                custom_category_item = QTreeWidgetItem(["Custom Nodes"])
+                for node_name in custom_node_types:
+                    display_name = node_name
+                    node_item = QTreeWidgetItem([display_name])
+                    node_item.setData(0, Qt.UserRole, f"custom_{node_name}")
+                    custom_category_item.addChild(node_item)
+                self.node_tree.addTopLevelItem(custom_category_item)
+        except Exception as e:
+            print(f"Error loading custom nodes: {e}")
+    
+    def refresh_palette(self):
+        """Refresh the node palette"""
+        self.populate_node_tree()
         self.node_tree.expandAll()
-        self.node_tree.itemDoubleClicked.connect(self.on_node_double_clicked)
-        
-        layout.addWidget(self.node_tree)
     
     def on_node_double_clicked(self, item, column):
         """Handle double-click on node type"""
@@ -332,6 +458,10 @@ class NodePalette(QWidget):
         if node_type:
             # Emit signal to create node at center of view
             self.node_requested.emit(node_type, (100, 100))
+    
+    def create_custom_node(self):
+        """Create a new custom node"""
+        self.node_requested.emit("custom", (100, 100))
 
 
 class PropertyPanel(QWidget):
@@ -386,6 +516,12 @@ class PropertyPanel(QWidget):
             type_label = QLabel(f"Type: {type(node).__name__}")
             layout.addWidget(type_label)
             
+            # Custom node editing
+            if hasattr(node, 'definition') and hasattr(node, 'is_custom_node'):
+                edit_custom_btn = QPushButton("Edit Custom Node")
+                edit_custom_btn.clicked.connect(self.edit_custom_node)
+                layout.addWidget(edit_custom_btn)
+            
             # Special properties for DataNode
             if isinstance(node, DataNode):
                 data_label = QLabel("Data:")
@@ -413,6 +549,27 @@ class PropertyPanel(QWidget):
         
         # Update the layout
         self.properties_frame.setLayout(layout)
+    
+    def edit_custom_node(self):
+        """Edit the current custom node"""
+        if CustomNodeDialog is None:
+            QMessageBox.warning(self, "Error", "Custom node dialog not available.")
+            return
+            
+        if self.current_node and hasattr(self.current_node.process_node, 'definition'):
+            node = self.current_node.process_node
+            dialog = CustomNodeDialog(self, node.definition)
+            dialog.node_created.connect(lambda name, definition: self.update_custom_node(node, definition))
+            dialog.exec()
+    
+    def update_custom_node(self, node, definition):
+        """Update a custom node with new definition"""
+        node.update_definition(definition)
+        self.update_properties()
+        
+        # Update the visual representation
+        if hasattr(self.current_node, 'update_from_definition'):
+            self.current_node.update_from_definition()
 
 
 class Pipeline:
