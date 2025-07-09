@@ -30,5 +30,16 @@
       "fullName",
       "userName"
     ]
+  },
+  "student": {
+    "input_ports": [
+      "first",
+      "last"
+    ],
+    "logic": "def execute(self, inputs):\n    student = inputs.get('first', '') + ' ' + inputs.get('last', '')\n    return {\n        'student': student\n    }",
+    "name": "student",
+    "output_ports": [
+      "student"
+    ]
   }
 }
