@@ -422,7 +422,7 @@ def main():
     window.show()
     
     # Create some example nodes
-    data_node_id = window.add_node("data", (100, 100))
+    data_node_id = window.add_node("array", (100, 100))
     if data_node_id:
         # Set some example data
         data_node = window.pipeline.nodes[data_node_id]
