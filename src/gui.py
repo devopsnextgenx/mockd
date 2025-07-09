@@ -46,13 +46,10 @@ class NodeGraphScene(QGraphicsScene):
     
     def add_node(self, node_type: str, position: Tuple[float, float] = (0, 0)) -> str:
         """Add a new node to the scene"""
-        print(f"Adding node of type: {node_type} at position: {position}")
         try:
             if node_type == "custom":
-                print(f"Creating custom node at position: {position}")
                 return self.add_custom_node(position)
             elif node_type.startswith("custom_"):
-                print(f"Creating existing custom node type: {node_type} at position: {position}")
                 # Handle existing custom node types
                 from .custom_nodes import custom_node_manager
                 custom_node = custom_node_manager.create_custom_node(node_type)
@@ -70,9 +67,7 @@ class NodeGraphScene(QGraphicsScene):
                 self.node_added.emit(node_id)
                 return node_id
             else:
-                print(f"Creating standard node type: {node_type} at position: {position}")
                 process_node = create_node(node_type)
-                print(f"Created process_node: {process_node}, type: {type(process_node)}")
                 
                 if process_node is None:
                     print(f"ERROR: create_node returned None for type: {node_type}")
@@ -82,28 +77,22 @@ class NodeGraphScene(QGraphicsScene):
                 
                 # Add to pipeline
                 node_id = self.pipeline.add_node(process_node)
-                print(f"Added to pipeline with ID: {node_id}")
                 
                 # Create visual representation
                 node_widget = NodeWidget(process_node)
-                print(f"Created NodeWidget: {node_widget}")
                 
                 # Debug the widget before positioning
-                print(f"Widget bounding rect before positioning: {node_widget.boundingRect()}")
                 
                 # Force the widget to calculate its size
                 node_widget.prepareGeometryChange()
                 
                 # Set position and add to scene  
                 node_widget.setPos(position[0], position[1])
-                print(f"Set widget position to: {position}")
                 
                 self.addItem(node_widget)
-                print(f"Added widget to scene")
                 
                 # Store reference
                 self.node_widgets[node_id] = node_widget
-                print(f"Stored widget reference with ID: {node_id}")
                 
                 # Make sure the widget is visible and has proper size
                 node_widget.setVisible(True)
@@ -114,14 +103,12 @@ class NodeGraphScene(QGraphicsScene):
                 
                 # Debug the widget after adding to scene
                 widget_rect = node_widget.boundingRect()
-                print(f"Widget bounding rect after adding to scene: {widget_rect}")
                 
                 # If the widget has zero size, there's a problem with NodeWidget
                 if widget_rect.width() == 0 or widget_rect.height() == 0:
                     print("ERROR: NodeWidget has zero size! Check ui_node_widget.py implementation")
                     # Set a minimum fallback size for debugging
                     fallback_rect = QRectF(0, 0, 120, 80)
-                    print(f"Using fallback rect: {fallback_rect}")
                     widget_rect = fallback_rect
                 
                 # Update scene rect to include the widget
@@ -147,7 +134,6 @@ class NodeGraphScene(QGraphicsScene):
                     )
                 
                 self.setSceneRect(new_scene_rect)
-                print(f"Updated scene rect to: {new_scene_rect}")
                 
                 # Force scene update
                 self.update()
@@ -156,18 +142,11 @@ class NodeGraphScene(QGraphicsScene):
                 if self.views():
                     view = self.views()[0]
                     view.centerOn(node_widget)
-                    print(f"Centered view on node widget")
                 
                 # Emit signal
                 self.node_added.emit(node_id)
-                print(f"Emitted node_added signal for ID: {node_id}")
                 
                 # Print final debug info
-                print(f"Final scene rect: {self.sceneRect()}")
-                print(f"Items in scene: {len(self.items())}")
-                print(f"Widget final bounding rect: {node_widget.boundingRect()}")
-                print(f"Widget scene position: {node_widget.scenePos()}")
-                
                 return node_id
         except Exception as e:
             print(f"Failed to create node: {e}")
@@ -351,16 +330,10 @@ class NodeGraphView(QGraphicsView):
         
         # Set initial scene rect to ensure visibility
         self.setSceneRect(-1000, -1000, 2000, 2000)
-        
-        # Debug: Print view information
-        print(f"NodeGraphView initialized with scene: {scene}")
-        print(f"View rect: {self.rect()}")
-        print(f"Scene rect: {self.sceneRect()}")
     
     def center_on_point(self, point: QPointF):
         """Center the view on a specific point"""
         self.centerOn(point)
-        print(f"Centered view on point: {point}")
     
     def wheelEvent(self, event):
         """Handle mouse wheel for zooming"""
