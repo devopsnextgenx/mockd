@@ -251,7 +251,7 @@ class NodeGraphScene(QGraphicsScene):
         self.removeItem(connection_widget)
 
     def keyPressEvent(self, event):
-        """Handle delete key for selected items (connections/nodes)"""
+        """Handle delete key for selected items (connections/nodes) and esc for cancelling connection"""
         if event.key() == Qt.Key_Delete:
             for item in self.selectedItems():
                 if isinstance(item, ConnectionWidget):
@@ -263,6 +263,13 @@ class NodeGraphScene(QGraphicsScene):
                             self.remove_node(node_id)
                             break
             return  # Prevent base class from interfering with deletion
+        # --- ADDED: ESC cancels connection creation ---
+        if event.key() == Qt.Key_Escape:
+            if self.creating_connection and self.temp_connection:
+                self.removeItem(self.temp_connection)
+                self.creating_connection = False
+                self.temp_connection = None
+                return  # Prevent further processing
         super().keyPressEvent(event)
     
     def add_custom_node(self, position: Tuple[float, float] = (0, 0)) -> str:
