@@ -71,14 +71,31 @@ class NodeWidget(QGraphicsRectItem):
 
     def create_ports(self):
         """Create input and output ports"""
-        if not hasattr(self.process_node, 'input_ports') or not hasattr(self.process_node, 'output_ports'):
-            print(f"Warning: ProcessNode {self.process_node.name} missing input_ports or output_ports")
-            return
-            
         y_offset = 30
         
+        # Get input ports - handle different ways they might be stored
+        input_ports = {}
+        if hasattr(self.process_node, 'input_ports'):
+            input_ports = self.process_node.input_ports
+        elif hasattr(self.process_node, 'inputs'):
+            input_ports = self.process_node.inputs
+        elif hasattr(self.process_node, 'properties'):
+            # For custom nodes that store properties
+            input_ports = self.process_node.properties
+        
+        # Get output ports
+        output_ports = {}
+        if hasattr(self.process_node, 'output_ports'):
+            output_ports = self.process_node.output_ports
+        elif hasattr(self.process_node, 'outputs'):
+            output_ports = self.process_node.outputs
+        
+        if not input_ports and not output_ports:
+            print(f"Warning: Node {getattr(self.process_node, 'name', 'Unknown')} has no ports or properties")
+            return
+            
         # Create input ports
-        for i, (name, port) in enumerate(self.process_node.input_ports.items()):
+        for i, (name, port) in enumerate(input_ports.items()):
             port_widget = NodePort(name, True, self, self)
             port_widget.setPos(-6, y_offset + i * 20)
             self.input_ports[name] = port_widget
@@ -90,7 +107,7 @@ class NodeWidget(QGraphicsRectItem):
             label.setFont(QFont("Arial", 8))
         
         # Create output ports
-        for i, (name, port) in enumerate(self.process_node.output_ports.items()):
+        for i, (name, port) in enumerate(output_ports.items()):
             port_widget = NodePort(name, False, self, self)
             port_widget.setPos(self.node_width + 6, y_offset + i * 20)
             self.output_ports[name] = port_widget
@@ -136,30 +153,63 @@ class NodeWidget(QGraphicsRectItem):
         """Display node properties on the card"""
         # Remove old property labels
         for label in getattr(self, 'properties_labels', {}).values():
-            if isinstance(label, (QGraphicsTextItem, QGraphicsProxyWidget)):
+            if isinstance(label, tuple):
+                for item in label:
+                    if isinstance(item, (QGraphicsTextItem, QGraphicsProxyWidget)):
+                        if hasattr(item, 'setParentItem'):
+                            item.setParentItem(None)
+            elif isinstance(label, (QGraphicsTextItem, QGraphicsProxyWidget)):
                 if hasattr(label, 'setParentItem'):
                     label.setParentItem(None)
         self.properties_labels = {}
         
         y_offset = 55
         
-        # Show input ports as label/value pairs
+        # Get properties to display - try multiple sources
+        properties_to_show = {}
+        
+        # Try input_ports first
         if hasattr(self.process_node, 'input_ports') and self.process_node.input_ports:
-            for i, (port_name, port) in enumerate(self.process_node.input_ports.items()):
-                # Property name label
-                label = QGraphicsTextItem(f"{port_name}: ", self)
-                label.setPos(10, y_offset + i * 22)
-                label.setDefaultTextColor(QColor(220, 220, 220))
-                label.setFont(QFont("Arial", 8))
-                
-                # Property value label
-                value_text = str(getattr(port, 'value', ''))
-                value_label = QGraphicsTextItem(value_text, self)
-                value_label.setPos(70, y_offset + i * 22)
-                value_label.setDefaultTextColor(QColor(255, 255, 180))
-                value_label.setFont(QFont("Arial", 8))
-                
-                self.properties_labels[port_name] = (label, value_label)
+            for port_name, port in self.process_node.input_ports.items():
+                value = getattr(port, 'value', getattr(port, 'default_value', ''))
+                properties_to_show[port_name] = value
+        # Try inputs
+        elif hasattr(self.process_node, 'inputs') and self.process_node.inputs:
+            for prop_name, prop in self.process_node.inputs.items():
+                value = getattr(prop, 'value', getattr(prop, 'default_value', ''))
+                properties_to_show[prop_name] = value
+        # Try properties directly
+        elif hasattr(self.process_node, 'properties') and self.process_node.properties:
+            for prop_name, prop in self.process_node.properties.items():
+                if isinstance(prop, dict):
+                    value = prop.get('value', prop.get('default_value', ''))
+                else:
+                    value = getattr(prop, 'value', getattr(prop, 'default_value', str(prop)))
+                properties_to_show[prop_name] = value
+        # Fallback: try to get any attributes that look like properties
+        else:
+            for attr_name in dir(self.process_node):
+                if not attr_name.startswith('_') and attr_name not in ['name', 'position', 'input_ports', 'output_ports']:
+                    attr_value = getattr(self.process_node, attr_name)
+                    if not callable(attr_value):
+                        properties_to_show[attr_name] = str(attr_value)
+        
+        # Display properties
+        for i, (prop_name, value) in enumerate(properties_to_show.items()):
+            # Property name label
+            label = QGraphicsTextItem(f"{prop_name}: ", self)
+            label.setPos(10, y_offset + i * 22)
+            label.setDefaultTextColor(QColor(220, 220, 220))
+            label.setFont(QFont("Arial", 8))
+            
+            # Property value label
+            value_text = str(value)
+            value_label = QGraphicsTextItem(value_text, self)
+            value_label.setPos(70, y_offset + i * 22)
+            value_label.setDefaultTextColor(QColor(255, 255, 180))
+            value_label.setFont(QFont("Arial", 8))
+            
+            self.properties_labels[prop_name] = (label, value_label)
         
         self.adjust_card_size_for_properties()
 
@@ -171,36 +221,58 @@ class NodeWidget(QGraphicsRectItem):
         
         # Remove old property labels
         for label_pair in self.properties_labels.values():
-            for label in label_pair:
-                if hasattr(label, 'setParentItem'):
-                    label.setParentItem(None)
+            if isinstance(label_pair, tuple):
+                for label in label_pair:
+                    if hasattr(label, 'setParentItem'):
+                        label.setParentItem(None)
+            else:
+                if hasattr(label_pair, 'setParentItem'):
+                    label_pair.setParentItem(None)
         
         self.properties_labels = {}
         self.edit_proxies = {}
         y_offset = 55
         
+        # Get editable properties
+        editable_properties = {}
+        
         if hasattr(self.process_node, 'input_ports') and self.process_node.input_ports:
-            for i, (port_name, port) in enumerate(self.process_node.input_ports.items()):
-                # Property name label
-                label = QGraphicsTextItem(f"{port_name}: ", self)
-                label.setPos(10, y_offset + i * 22)
-                label.setDefaultTextColor(QColor(220, 220, 220))
-                label.setFont(QFont("Arial", 8))
-                
-                # Property value editor
-                current_value = str(getattr(port, 'value', ''))
-                editor = QLineEdit(current_value)
-                proxy = QGraphicsProxyWidget(self)
-                proxy.setWidget(editor)
-                proxy.setPos(70, y_offset + i * 22 - 2)
-                
-                # Connect editor signals
-                editor.editingFinished.connect(
-                    lambda port_name=port_name, proxy=proxy: self.update_property_with_proxy(proxy, port_name)
-                )
-                
-                self.properties_labels[port_name] = (label, proxy)
-                self.edit_proxies[port_name] = editor
+            for port_name, port in self.process_node.input_ports.items():
+                value = getattr(port, 'value', getattr(port, 'default_value', ''))
+                editable_properties[port_name] = value
+        elif hasattr(self.process_node, 'inputs') and self.process_node.inputs:
+            for prop_name, prop in self.process_node.inputs.items():
+                value = getattr(prop, 'value', getattr(prop, 'default_value', ''))
+                editable_properties[prop_name] = value
+        elif hasattr(self.process_node, 'properties') and self.process_node.properties:
+            for prop_name, prop in self.process_node.properties.items():
+                if isinstance(prop, dict):
+                    value = prop.get('value', prop.get('default_value', ''))
+                else:
+                    value = getattr(prop, 'value', getattr(prop, 'default_value', str(prop)))
+                editable_properties[prop_name] = value
+        
+        for i, (prop_name, value) in enumerate(editable_properties.items()):
+            # Property name label
+            label = QGraphicsTextItem(f"{prop_name}: ", self)
+            label.setPos(10, y_offset + i * 22)
+            label.setDefaultTextColor(QColor(220, 220, 220))
+            label.setFont(QFont("Arial", 8))
+            
+            # Property value editor
+            current_value = str(value)
+            editor = QLineEdit(current_value)
+            proxy = QGraphicsProxyWidget(self)
+            proxy.setWidget(editor)
+            proxy.setPos(70, y_offset + i * 22 - 2)
+            
+            # Connect editor signals
+            editor.editingFinished.connect(
+                lambda prop_name=prop_name, proxy=proxy: self.update_property_with_proxy(proxy, prop_name)
+            )
+            
+            self.properties_labels[prop_name] = (label, proxy)
+            self.edit_proxies[prop_name] = editor
         
         self.adjust_card_size_for_properties()
 
@@ -230,22 +302,64 @@ class NodeWidget(QGraphicsRectItem):
 
     def update_property(self, property_name, value):
         """Update a property value"""
-        if hasattr(self.process_node, 'set_input_value'):
-            self.process_node.set_input_value(property_name, value)
+        # Try different methods to update the property
+        updated = False
         
-        # Also update output if it's a DataNode
-        if hasattr(self.process_node, 'output_ports') and property_name in getattr(self.process_node, 'output_ports', {}):
-            if hasattr(self.process_node, 'set_output_value'):
-                self.process_node.set_output_value(property_name, value)
+        # Try input_ports
+        if hasattr(self.process_node, 'set_input_value'):
+            try:
+                self.process_node.set_input_value(property_name, value)
+                updated = True
+            except:
+                pass
+        elif hasattr(self.process_node, 'input_ports') and property_name in self.process_node.input_ports:
+            if hasattr(self.process_node.input_ports[property_name], 'value'):
+                self.process_node.input_ports[property_name].value = value
+                updated = True
+        
+        # Try inputs
+        elif hasattr(self.process_node, 'inputs') and property_name in self.process_node.inputs:
+            if hasattr(self.process_node.inputs[property_name], 'value'):
+                self.process_node.inputs[property_name].value = value
+                updated = True
+        
+        # Try properties
+        elif hasattr(self.process_node, 'properties') and property_name in self.process_node.properties:
+            prop = self.process_node.properties[property_name]
+            if isinstance(prop, dict):
+                prop['value'] = value
+                updated = True
+            elif hasattr(prop, 'value'):
+                prop.value = value
+                updated = True
+        
+        # Try direct attribute setting as fallback
+        if not updated:
+            try:
+                setattr(self.process_node, property_name, value)
+                updated = True
+            except:
+                pass
+        
+        if updated:
+            # Try to notify the process node of the change
+            if hasattr(self.process_node, 'data_changed'):
+                self.process_node.data_changed.emit()
         
         self.refresh()
 
     def adjust_card_size_for_properties(self):
         """Adjust card size to fit properties"""
-        if not hasattr(self.process_node, 'input_ports'):
-            return
-            
-        num_props = len(self.process_node.input_ports)
+        num_props = 0
+        
+        # Count properties from various sources
+        if hasattr(self.process_node, 'input_ports'):
+            num_props = len(self.process_node.input_ports)
+        elif hasattr(self.process_node, 'inputs'):
+            num_props = len(self.process_node.inputs)
+        elif hasattr(self.process_node, 'properties'):
+            num_props = len(self.process_node.properties)
+        
         min_height = 100
         prop_height = 22 * num_props + 55
         new_height = max(min_height, prop_height)
