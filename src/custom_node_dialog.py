@@ -94,7 +94,7 @@ class CustomNodeDialog(QDialog):
         
         logic_help = QLabel("""
 Write Python code for your node logic. Available variables:
-- inputs: dict containing input port values (e.g., inputs['data'])
+- input: dict containing input port values (e.g., inputs['data'])
 - self: reference to the node instance
 - self.properties: dict for storing node properties
 
@@ -213,8 +213,8 @@ return {'output': result, 'status': 'success'}
         
         definition = {
             "name": name,
-            "inputs": inputs,
-            "outputs": outputs,
+            "input_ports": inputs,
+            "output_ports": outputs,
             "logic": logic
         }
         
@@ -225,10 +225,10 @@ return {'output': result, 'status': 'success'}
         """Load an existing node definition"""
         self.name_edit.setText(definition.get("name", ""))
         
-        for input_name in definition.get("inputs", []):
+        for input_name in definition.get("input_ports", []):
             self.inputs_list.addItem(input_name)
         
-        for output_name in definition.get("outputs", []):
+        for output_name in definition.get("output_ports", []):
             self.outputs_list.addItem(output_name)
         
         self.logic_edit.setPlainText(definition.get("logic", ""))

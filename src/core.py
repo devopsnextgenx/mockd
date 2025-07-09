@@ -384,11 +384,11 @@ class JsonDefinedNode(ProcessNode):
     JSON example:
     {
         "name": "MultiplyByN",
-        "inputs": [
+        "input_ports": [
             {"name": "value", "type": "float"},
             {"name": "factor", "type": "float"}
         ],
-        "outputs": [
+        "output_ports": [
             {"name": "result", "type": "float"}
         ],
         "logic": "result = value * factor"
@@ -398,10 +398,10 @@ class JsonDefinedNode(ProcessNode):
         super().__init__(definition.get("name", "CustomNode"))
         self.definition = definition
         # Add input ports
-        for inp in definition.get("inputs", []):
+        for inp in definition.get("input_ports", []):
             self.add_input_port(inp["name"], eval(inp.get("type", "Any")))
         # Add output ports
-        for outp in definition.get("outputs", []):
+        for outp in definition.get("output_ports", []):
             self.add_output_port(outp["name"], eval(outp.get("type", "Any")))
         self.logic = definition.get("logic", "")
         self.properties = definition.get("properties", {})

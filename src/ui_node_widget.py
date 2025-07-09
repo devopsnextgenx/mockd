@@ -73,22 +73,25 @@ class NodeWidget(QGraphicsRectItem):
         """Create input and output ports"""
         y_offset = 30
         
-        # Get input ports - handle different ways they might be stored
+        # Get input ports using input_names property
+        input_names = getattr(self.process_node, 'input_names', [])
         input_ports = {}
-        if hasattr(self.process_node, 'input_ports'):
-            input_ports = self.process_node.input_ports
-        elif hasattr(self.process_node, 'inputs'):
-            input_ports = self.process_node.inputs
-        elif hasattr(self.process_node, 'properties'):
-            # For custom nodes that store properties
-            input_ports = self.process_node.properties
+        
+        # Build input_ports dict from input_names
+        if input_names:
+            for name in input_names:
+                # Try to get the actual port object if it exists
+                if hasattr(self.process_node, 'input_ports') and name in self.process_node.input_ports:
+                    input_ports[name] = self.process_node.input_ports[name]
+                else:
+                    # Create a placeholder port object if needed
+                    input_ports[name] = type('Port', (), {'name': name, 'value': '', 'default_value': ''})()
+        else:
+            # Fallback to existing input_ports if input_names not available
+            input_ports = getattr(self.process_node, 'input_ports', {})
         
         # Get output ports
-        output_ports = {}
-        if hasattr(self.process_node, 'output_ports'):
-            output_ports = self.process_node.output_ports
-        elif hasattr(self.process_node, 'outputs'):
-            output_ports = self.process_node.outputs
+        output_ports = getattr(self.process_node, 'output_ports', {})
         
         if not input_ports and not output_ports:
             print(f"Warning: Node {getattr(self.process_node, 'name', 'Unknown')} has no ports or properties")
@@ -165,11 +168,31 @@ class NodeWidget(QGraphicsRectItem):
         
         y_offset = 55
         
-        # Get properties to display - try multiple sources
+        # Get properties to display using input_names
         properties_to_show = {}
         
-        # Try input_ports first
-        if hasattr(self.process_node, 'input_ports') and self.process_node.input_ports:
+        # Try input_names first
+        input_names = getattr(self.process_node, 'input_names', [])
+        if input_names:
+            for port_name in input_names:
+                value = ''
+                # Try to get value from input_ports if it exists
+                if hasattr(self.process_node, 'input_ports') and port_name in self.process_node.input_ports:
+                    port = self.process_node.input_ports[port_name]
+                    value = getattr(port, 'value', getattr(port, 'default_value', ''))
+                # Try to get value from inputs
+                elif hasattr(self.process_node, 'inputs') and port_name in self.process_node.inputs:
+                    prop = self.process_node.inputs[port_name]
+                    value = getattr(prop, 'value', getattr(prop, 'default_value', ''))
+                # Try direct attribute access
+                elif hasattr(self.process_node, port_name):
+                    attr_value = getattr(self.process_node, port_name)
+                    if not callable(attr_value):
+                        value = str(attr_value)
+                
+                properties_to_show[port_name] = value
+        # Fallback to existing logic if input_names not available
+        elif hasattr(self.process_node, 'input_ports') and self.process_node.input_ports:
             for port_name, port in self.process_node.input_ports.items():
                 value = getattr(port, 'value', getattr(port, 'default_value', ''))
                 properties_to_show[port_name] = value

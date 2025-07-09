@@ -20,10 +20,9 @@ class CustomNode(ProcessNode):
         # Set node type
         self.node_type = "custom"
         
-        # Set up inputs and outputs
-        self.input_names = definition.get("inputs", [])
-        self.output_names = definition.get("outputs", [])
-        
+        # Set up inputs and outputs using ProcessNode methods
+        self._setup_ports(definition)
+
         # Store the logic code
         self.logic_code = definition.get("logic", "")
         
@@ -33,6 +32,36 @@ class CustomNode(ProcessNode):
         
         # Compile the logic for execution
         self._compile_logic()
+    
+    def _setup_ports(self, definition: Dict[str, Any]):
+        """Set up input and output ports using ProcessNode methods"""
+        # Add input ports
+        input_ports = definition.get("input_ports", [])
+        for port_def in input_ports:
+            if isinstance(port_def, str):
+                # Simple string port name
+                self.add_input_port(port_def)
+            elif isinstance(port_def, dict):
+                # Dictionary with port details
+                port_name = port_def.get("name", "input")
+                data_type = port_def.get("data_type", "any")
+                self.add_input_port(port_name, data_type)
+            else:
+                print(f"Warning: Invalid input port definition: {port_def}")
+    
+        # Add output ports
+        output_ports = definition.get("output_ports", [])
+        for port_def in output_ports:
+            if isinstance(port_def, str):
+                # Simple string port name
+                self.add_output_port(port_def)
+            elif isinstance(port_def, dict):
+                # Dictionary with port details
+                port_name = port_def.get("name", "output")
+                data_type = port_def.get("data_type", "any")
+                self.add_output_port(port_name, data_type)
+            else:
+                print(f"Warning: Invalid output port definition: {port_def}")
     
     def _compile_logic(self):
         """Compile the custom logic code"""
@@ -47,7 +76,7 @@ class CustomNode(ProcessNode):
             print(f"Failed to compile custom node logic: {e}")
             # Fallback to a simple pass-through
             self.compiled_globals = {
-                "execute": lambda self, inputs: {output: None for output in self.output_names}
+                "execute": lambda self, inputs: {output: None for output in self.get_output_port_names()}
             }
     
     def execute(self, inputs: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -67,20 +96,34 @@ class CustomNode(ProcessNode):
                 return result
             else:
                 # Fallback
-                return {output: None for output in self.output_names}
+                return {output: None for output in self.get_output_port_names()}
                 
         except Exception as e:
             print(f"Error executing custom node {self.name}: {e}")
-            return {output: None for output in self.output_names}
+            return {output: None for output in self.get_output_port_names()}
     
     def update_definition(self, new_definition: Dict[str, Any]):
         """Update the node definition"""
         self.definition = new_definition
         self.name = new_definition.get("name", self.name)
-        self.input_names = new_definition.get("inputs", [])
-        self.output_names = new_definition.get("outputs", [])
+        
+        # Clear existing ports
+        self.clear_input_ports()
+        self.clear_output_ports()
+        
+        # Set up new ports
+        self._setup_ports(new_definition)
+        
         self.logic_code = new_definition.get("logic", "")
         self._compile_logic()
+    
+    def get_input_port_names(self) -> List[str]:
+        """Get list of input port names"""
+        return list(self.inputs.keys())
+    
+    def get_output_port_names(self) -> List[str]:
+        """Get list of output port names"""
+        return list(self.outputs.keys())
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the custom node"""

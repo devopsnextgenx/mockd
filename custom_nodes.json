@@ -1,7 +1,7 @@
 {
   "MultiplyByN": {
     "name": "MultiplyByN",
-    "inputs": [
+    "input_ports": [
       {
         "name": "value",
         "type": "float or list"
@@ -11,7 +11,7 @@
         "type": "float"
       }
     ],
-    "outputs": [
+    "output_ports": [
       {
         "name": "result",
         "type": "float or list"
@@ -20,13 +20,13 @@
     "logic": "def execute(self, inputs):\n    f = inputs.get('factor', 1)[0] if isinstance(inputs.get('factor', 1), list) else inputs.get('factor', 1);\n    result = [v * f for v in inputs.get('value', [])] if isinstance(inputs.get('value', []), list) else inputs.get('value', 0) * f;\n    return {\n        'result': result\n    }"
   },
   "user": {
-    "inputs": [
+    "input_ports": [
       "firstName",
       "lastName"
     ],
     "logic": "def execute(self, inputs):\n    fullName = inputs.get('firstName', '') + ' ' + inputs.get('lastName', '')\n    userName = inputs.get('firstName', '')+ inputs.get('lastName', '')\n    return {\n        'fullName': fullName,\n        'userName': userName\n    }",
     "name": "user",
-    "outputs": [
+    "output_ports": [
       "fullName",
       "userName"
     ]
