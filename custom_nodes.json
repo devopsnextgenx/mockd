@@ -17,7 +17,7 @@
         "type": "float or list"
       }
     ],
-    "logic": "f = factor[0] if isinstance(factor, list) else factor; result = [v * f for v in value] if isinstance(value, list) else value * f"
+    "logic": "def execute(self, inputs):\n    f = inputs.get('factor', 1)[0] if isinstance(inputs.get('factor', 1), list) else inputs.get('factor', 1);\n    result = [v * f for v in inputs.get('value', [])] if isinstance(inputs.get('value', []), list) else inputs.get('value', 0) * f;\n    return {\n        'result': result\n    }"
   },
   "user": {
     "inputs": [

@@ -46,10 +46,13 @@ class NodeGraphScene(QGraphicsScene):
     
     def add_node(self, node_type: str, position: Tuple[float, float] = (0, 0)) -> str:
         """Add a new node to the scene"""
+        print(f"Adding node of type: {node_type} at position: {position}")
         try:
             if node_type == "custom":
+                print(f"Creating custom node at position: {position}")
                 return self.add_custom_node(position)
             elif node_type.startswith("custom_"):
+                print(f"Creating existing custom node type: {node_type} at position: {position}")
                 # Handle existing custom node types
                 from .custom_nodes import custom_node_manager
                 custom_node = custom_node_manager.create_custom_node(node_type)
@@ -67,22 +70,109 @@ class NodeGraphScene(QGraphicsScene):
                 self.node_added.emit(node_id)
                 return node_id
             else:
+                print(f"Creating standard node type: {node_type} at position: {position}")
                 process_node = create_node(node_type)
+                print(f"Created process_node: {process_node}, type: {type(process_node)}")
+                
+                if process_node is None:
+                    print(f"ERROR: create_node returned None for type: {node_type}")
+                    return ""
+                
                 process_node.position = position
                 
                 # Add to pipeline
                 node_id = self.pipeline.add_node(process_node)
+                print(f"Added to pipeline with ID: {node_id}")
                 
                 # Create visual representation
                 node_widget = NodeWidget(process_node)
-                node_widget.setPos(position[0], position[1])
-                self.addItem(node_widget)
-                self.node_widgets[node_id] = node_widget
+                print(f"Created NodeWidget: {node_widget}")
                 
+                # Debug the widget before positioning
+                print(f"Widget bounding rect before positioning: {node_widget.boundingRect()}")
+                
+                # Force the widget to calculate its size
+                node_widget.prepareGeometryChange()
+                
+                # Set position and add to scene  
+                node_widget.setPos(position[0], position[1])
+                print(f"Set widget position to: {position}")
+                
+                self.addItem(node_widget)
+                print(f"Added widget to scene")
+                
+                # Store reference
+                self.node_widgets[node_id] = node_widget
+                print(f"Stored widget reference with ID: {node_id}")
+                
+                # Make sure the widget is visible and has proper size
+                node_widget.setVisible(True)
+                node_widget.show()
+                
+                # Force geometry update
+                node_widget.update()
+                
+                # Debug the widget after adding to scene
+                widget_rect = node_widget.boundingRect()
+                print(f"Widget bounding rect after adding to scene: {widget_rect}")
+                
+                # If the widget has zero size, there's a problem with NodeWidget
+                if widget_rect.width() == 0 or widget_rect.height() == 0:
+                    print("ERROR: NodeWidget has zero size! Check ui_node_widget.py implementation")
+                    # Set a minimum fallback size for debugging
+                    fallback_rect = QRectF(0, 0, 120, 80)
+                    print(f"Using fallback rect: {fallback_rect}")
+                    widget_rect = fallback_rect
+                
+                # Update scene rect to include the widget
+                widget_scene_rect = QRectF(
+                    position[0], position[1], 
+                    widget_rect.width(), widget_rect.height()
+                )
+                
+                current_scene_rect = self.sceneRect()
+                new_scene_rect = current_scene_rect.united(widget_scene_rect)
+                
+                # Ensure minimum scene size
+                min_width = max(new_scene_rect.width(), 2000)
+                min_height = max(new_scene_rect.height(), 2000)
+                
+                # Ensure the widget is within the scene bounds
+                if new_scene_rect.width() < 2000 or new_scene_rect.height() < 2000:
+                    center_x = position[0]
+                    center_y = position[1]
+                    new_scene_rect = QRectF(
+                        center_x - min_width/2, center_y - min_height/2,
+                        min_width, min_height
+                    )
+                
+                self.setSceneRect(new_scene_rect)
+                print(f"Updated scene rect to: {new_scene_rect}")
+                
+                # Force scene update
+                self.update()
+                
+                # Center the view on the new node
+                if self.views():
+                    view = self.views()[0]
+                    view.centerOn(node_widget)
+                    print(f"Centered view on node widget")
+                
+                # Emit signal
                 self.node_added.emit(node_id)
+                print(f"Emitted node_added signal for ID: {node_id}")
+                
+                # Print final debug info
+                print(f"Final scene rect: {self.sceneRect()}")
+                print(f"Items in scene: {len(self.items())}")
+                print(f"Widget final bounding rect: {node_widget.boundingRect()}")
+                print(f"Widget scene position: {node_widget.scenePos()}")
+                
                 return node_id
         except Exception as e:
             print(f"Failed to create node: {e}")
+            import traceback
+            traceback.print_exc()
             return ""
     
     def remove_node(self, node_id: str):
@@ -258,28 +348,33 @@ class NodeGraphView(QGraphicsView):
         # Enable wheel zoom
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        
+        # Set initial scene rect to ensure visibility
+        self.setSceneRect(-1000, -1000, 2000, 2000)
+        
+        # Debug: Print view information
+        print(f"NodeGraphView initialized with scene: {scene}")
+        print(f"View rect: {self.rect()}")
+        print(f"Scene rect: {self.sceneRect()}")
+    
+    def center_on_point(self, point: QPointF):
+        """Center the view on a specific point"""
+        self.centerOn(point)
+        print(f"Centered view on point: {point}")
     
     def wheelEvent(self, event):
-        """Handle zoom with mouse wheel"""
+        """Handle mouse wheel for zooming"""
         zoom_in_factor = 1.25
         zoom_out_factor = 1 / zoom_in_factor
         
-        # Save the scene pos
-        old_pos = self.mapToScene(event.position().toPoint())
-        
-        # Zoom
+        # Set zoom factor
         if event.angleDelta().y() > 0:
             zoom_factor = zoom_in_factor
         else:
             zoom_factor = zoom_out_factor
+        
+        # Scale the view
         self.scale(zoom_factor, zoom_factor)
-        
-        # Get the new position
-        new_pos = self.mapToScene(event.position().toPoint())
-        
-        # Move scene to old position
-        delta = new_pos - old_pos
-        self.translate(delta.x(), delta.y())
 
 
 class NodePalette(QWidget):
@@ -456,12 +551,12 @@ class NodePalette(QWidget):
         """Handle double-click on node type"""
         node_type = item.data(0, Qt.UserRole)
         if node_type:
-            # Emit signal to create node at center of view
-            self.node_requested.emit(node_type, (100, 100))
-    
+            # Emit signal to create node at the center of the view
+            self.node_requested.emit(node_type, (0, 0))
+
     def create_custom_node(self):
         """Create a new custom node"""
-        self.node_requested.emit("custom", (100, 100))
+        self.node_requested.emit("custom", (0, 0))
 
 
 class PropertyPanel(QWidget):
