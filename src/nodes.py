@@ -471,11 +471,29 @@ CUSTOM_NODE_TYPES = {}
 def register_custom_nodes(json_path="custom_nodes.json"):
     global CUSTOM_NODE_DEFINITIONS, CUSTOM_NODE_TYPES
     try:
-        CUSTOM_NODE_DEFINITIONS = load_custom_node_definitions(json_path)
-        print(f"Loaded {len(CUSTOM_NODE_DEFINITIONS)} custom node definitions from {json_path}")
+        loaded_data = load_custom_node_definitions(json_path)
+        
+        # Handle both formats: list of definitions or dict of definitions
+        if isinstance(loaded_data, dict):
+            # Convert dict format to list format
+            CUSTOM_NODE_DEFINITIONS = []
+            for node_name, node_def in loaded_data.items():
+                # Ensure the definition has a name field
+                if isinstance(node_def, dict):
+                    node_def["name"] = node_def.get("name", node_name)
+                    CUSTOM_NODE_DEFINITIONS.append(node_def)
+        else:
+            # Already in list format
+            CUSTOM_NODE_DEFINITIONS = loaded_data
+            
+        print(f"Loading {len(CUSTOM_NODE_DEFINITIONS)} custom node definitions from {json_path}")
+        
         for defn in CUSTOM_NODE_DEFINITIONS:
-            node_type = defn.get("name", "CustomNode")
-            CUSTOM_NODE_TYPES[node_type] = lambda d=defn: JsonDefinedNode(d)
+            if isinstance(defn, dict):
+                node_type = defn.get("name", "CustomNode")
+                CUSTOM_NODE_TYPES[node_type] = lambda d=defn: JsonDefinedNode(d)
+            
+        print(f"Loaded {len(CUSTOM_NODE_DEFINITIONS)} custom node definitions")
     except Exception as e:
         print(f"Could not load custom nodes: {e}")
 
