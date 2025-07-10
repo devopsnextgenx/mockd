@@ -40,14 +40,17 @@ class NodeWidget(QGraphicsRectItem):
         self._hover_pen = QPen(QColor(100, 255, 255), 4, Qt.DashLine)
         self.setPen(self._default_pen)
         
-        # Create title
-        self.title = QGraphicsTextItem(process_node.name, self)
-        self.title.setPos(10, 5)
-        self.title.setDefaultTextColor(QColor(255, 255, 255))
-        font = QFont()
-        font.setBold(True)
-        self.title.setFont(font)
-        
+        # Remove old QGraphicsTextItem title
+        # self.title = QGraphicsTextItem(process_node.name, self)
+        # self.title.setPos(10, 5)
+        # self.title.setDefaultTextColor(QColor(255, 255, 255))
+        # font = QFont()
+        # font.setBold(True)
+        # self.title.setFont(font)
+
+        # Header height
+        self.header_height = 28
+
         # Initialize properties
         self.properties_labels = {}
         self.editing = False
@@ -65,13 +68,43 @@ class NodeWidget(QGraphicsRectItem):
         return QRectF(0, 0, self.node_width, self.node_height)
 
     def paint(self, painter, option, widget):
-        """Paint the node widget"""
-        # Let the parent QGraphicsRectItem handle the painting
-        super().paint(painter, option, widget)
+        """Paint the node widget with a header/titlebar"""
+        # Draw header/titlebar
+        header_rect = QRectF(0, 0, self.node_width, self.header_height)
+        painter.save()
+        painter.setBrush(QColor(40, 40, 40))  # dark gray
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(header_rect)
+
+        # Draw title in red
+        title = getattr(self.process_node, "name", "Node")
+        node_id = getattr(self.process_node, "node_id", self.process_node.id.split('-')[0])
+        title_text = f"{title} [{node_id}]"
+        font = QFont("Arial", 10)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor(220, 40, 40))  # red
+        painter.drawText(header_rect.adjusted(10, 0, -10, 0), Qt.AlignVCenter | Qt.AlignLeft, title_text)
+        painter.restore()
+
+        # Draw the rest of the node (body)
+        body_rect = QRectF(0, self.header_height, self.node_width, self.node_height - self.header_height)
+        painter.save()
+        painter.setBrush(self.brush())
+        painter.setPen(self.pen())
+        painter.drawRect(body_rect)
+        painter.restore()
+
+        # Draw border around the whole node
+        painter.save()
+        painter.setPen(self.pen())
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRect(QRectF(0, 0, self.node_width, self.node_height))
+        painter.restore()
 
     def create_ports(self):
         """Create input and output ports"""
-        y_offset = 30
+        y_offset = self.header_height + 2  # move ports below header
         
         # Get input ports using input_names property
         input_names = getattr(self.process_node, 'input_names', [])
@@ -102,19 +135,19 @@ class NodeWidget(QGraphicsRectItem):
             port_widget = NodePort(name, True, self, self)
             port_widget.setPos(-6, y_offset + i * 20)
             self.input_ports[name] = port_widget
-            
+
             # Create label for input port
             label = QGraphicsTextItem(name, self)
             label.setPos(15, y_offset + i * 20 - 8)
             label.setDefaultTextColor(QColor(200, 200, 200))
             label.setFont(QFont("Arial", 8))
-        
+
         # Create output ports
         for i, (name, port) in enumerate(output_ports.items()):
             port_widget = NodePort(name, False, self, self)
             port_widget.setPos(self.node_width + 6, y_offset + i * 20)
             self.output_ports[name] = port_widget
-            
+
             # Create label for output port
             label = QGraphicsTextItem(name, self)
             label.setPos(self.node_width - 35, y_offset + i * 20 - 8)
@@ -166,7 +199,7 @@ class NodeWidget(QGraphicsRectItem):
                     label.setParentItem(None)
         self.properties_labels = {}
         
-        y_offset = 55
+        y_offset = self.header_height + 25  # move properties below header
         
         # Get properties to display using input_names
         properties_to_show = {}
@@ -254,7 +287,7 @@ class NodeWidget(QGraphicsRectItem):
         
         self.properties_labels = {}
         self.edit_proxies = {}
-        y_offset = 55
+        y_offset = self.header_height + 25  # move editors below header
         
         # Get editable properties
         editable_properties = {}
@@ -384,7 +417,7 @@ class NodeWidget(QGraphicsRectItem):
             num_props = len(self.process_node.properties)
         
         min_height = 100
-        prop_height = 22 * num_props + 55
+        prop_height = 22 * num_props + self.header_height + 25
         new_height = max(min_height, prop_height)
         
         # Update node dimensions

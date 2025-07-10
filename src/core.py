@@ -183,7 +183,7 @@ class DataNode(ProcessNode):
             except ValueError:
                 self.input = [self.input]
         if input_val is not None:
-            self.output = typed_input if isinstance(typed_input, list) else input_val
+            self.output = input_val[0] if isinstance(input_val, list) else input_val
         self.set_output_value("output", self.output)
         return True
 
