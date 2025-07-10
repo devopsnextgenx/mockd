@@ -305,19 +305,67 @@ class Pipeline:
         return True
     
     def execute(self) -> Dict[str, Any]:
-        """Execute the pipeline by running nodes in topological order"""
-        # Simple execution order based on dependencies
+        """Execute the pipeline by running nodes in topological order, with special handling for forEach nodes."""
         executed = set()
         results = {}
-        
+
+        # Helper to find downstream node for a given node and output port
+        def get_downstream_node(node_id, output_port):
+            for conn in self.connections.values():
+                if conn.source_node_id == node_id and conn.source_port == output_port:
+                    return self.nodes.get(conn.target_node_id), conn.target_port
+            return None, None
+
         def can_execute_node(node: ProcessNode) -> bool:
             return node.can_execute() and node.id not in executed
-        
-        # Keep executing until no more nodes can be executed
+
         while len(executed) < len(self.nodes):
             executed_this_round = False
-            
+
             for node_id, node in self.nodes.items():
+                if node_id in executed:
+                    continue
+
+                # Special handling for forEach node
+                if isinstance(node, ProcessNode) and getattr(node, "name", "").lower() == "foreach":
+                    if not node.can_execute():
+                        continue
+                    continueLoop = True
+                    exitLoop = False
+                    index = 0
+                    iterate_node, iterate_port = get_downstream_node(node_id, "iterate")
+                    while (continueLoop):
+                        result = node.process(index)
+                        index += 1
+                        continueLoop = result.get("continueLoop")
+                        exitLoop = result.get("exitLoop")
+                        item = node.get_output_value("iterate")
+                        if iterate_node and continueLoop:
+                            iterate_node.set_input_value("item", item)
+                            iterate_node.process()
+                            results[iterate_node.id] = {
+                                'success': True,
+                                'outputs': {name: port.value for name, port in iterate_node.output_ports.items()}
+                            }
+                    # Find downstream node for 'iterate'
+                    # For each item, set input and execute downstream node
+                    
+                    # After loop, execute downstream node for 'exit'
+                    exit_node, exit_port = get_downstream_node(node_id, "exit")
+                    if exit_node and exitLoop:
+                        exit_node.process()
+                        results[exit_node.id] = {
+                            'success': True,
+                            'outputs': {name: port.value for name, port in exit_node.output_ports.items()}
+                        }
+                    executed.add(node_id)
+                    results[node_id] = {
+                        'success': True,
+                        'outputs': {name: port.value for name, port in node.output_ports.items()}
+                    }
+                    executed_this_round = True
+                    continue
+
                 if can_execute_node(node):
                     success = node.process()
                     executed.add(node_id)
@@ -326,11 +374,11 @@ class Pipeline:
                         'outputs': {name: port.value for name, port in node.output_ports.items()}
                     }
                     executed_this_round = True
-            
+
             if not executed_this_round:
                 # Circular dependency or missing inputs
                 break
-        
+
         return results
     
     def get_execution_order(self) -> List[str]:

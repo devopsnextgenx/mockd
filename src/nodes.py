@@ -233,7 +233,7 @@ class PrintNode(ProcessNode):
     def process(self) -> bool:
         try:
             data = self.get_input_value("data")
-            print(f"[{self.name}] {data}")
+            print(f"[{self.name} - {self.id.split('-')[0]}] {data}")
             self.set_output_value("data", data)
             return True
         except Exception:
@@ -418,19 +418,20 @@ class ForEachNode(ProcessNode):
         self.add_output_port("exit", Any)     # Used to trigger downstream node after loop
         self.properties = {}
 
-    def process(self) -> bool:
+    def process(self, index) -> any:
         items = self.get_input_value("items")
         if not isinstance(items, list):
             self.set_output_value("iterate", None)
             self.set_output_value("exit", None)
-            return False
+            return {"continueLoop": False, "exit": False}
 
         # For pipeline execution: set 'iterate' to a generator of items
         # Downstream node should expect to receive 'item' as input for each iteration
-        self.set_output_value("iterate", items)
+        self.set_output_value("iterate", items[index] if index < len(items) else None)
         self.set_output_value("exit", True)  # Just a signal; downstream can use or ignore
-
-        return True
+        continueLoop = index < len(items) - 1  # Continue if there are more items to process
+        exitLoop = not continueLoop  # Exit if no more items to process
+        return {"continueLoop": continueLoop, "exit": exitLoop}
 
 # Node factory for easy node creation
 NODE_TYPES = {
