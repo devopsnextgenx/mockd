@@ -54,6 +54,7 @@ class ProcessNode(QObject, ABC, metaclass=MetaQObjectABC):
         self.position = (0, 0)
         self.metadata: Dict[str, Any] = {}
         self.properties: Dict[str, Any] = {}  # Ensure all nodes have a 'properties' attribute
+        self.type = self.__class__.__name__.lower().replace('node', '')  # Add this line
     
     def add_input_port(self, name: str, data_type: type = Any):
         """Add an input port to the node"""
@@ -156,7 +157,6 @@ class FalseNode(ProcessNode):
 
 class DataNode(ProcessNode):
     """A node that holds static data"""
-    
     def __init__(self, name: str, input: Any = None):
         super().__init__(name)
         self.input = input
@@ -164,6 +164,7 @@ class DataNode(ProcessNode):
         self.add_input_port("input", type(input) if input else Any)  # Add input port
         self.add_output_port("output", type(input) if input else Any)
         self.properties = {"data": input}  # Add properties for DataNode
+        self.type = "data"  # Explicitly set type
     
     def process(self) -> bool:
         # If input is connected or set, use it as data
@@ -195,20 +196,21 @@ class DataNode(ProcessNode):
         self.properties["data"] = data
         self.data_changed.emit()
 
-class ArrayDataNode(DataNode):
+class ArrayNode(DataNode):
     """A node that holds an array of data"""
     
     def __init__(self, name: str, input: List[Any] = None):
         super().__init__(name, input if input is not None else [])
         self.add_input_port("input", List[Any])
         self.add_output_port("output", List[Any])
-        self.properties = {"data": input}  # Add properties for ArrayDataNode
+        self.properties = {"data": input}  # Add properties for ArrayNode
+        self.type = "array"  # Explicitly set type
     
     def process(self) -> bool:
         # If input is connected or set, use it as data
         input_val = self.get_input_value("input")
         self.input = input_val if input_val is not None else self.input
-        self.output = self.input  # Output is the same as input for ArrayDataNode
+        self.output = self.input  # Output is the same as input for ArrayNode
         self.set_output_value("output", self.output)
         return True
     
@@ -309,15 +311,32 @@ class Pipeline:
         executed = set()
         results = {}
 
-        # Helper to find downstream node for a given node and output port
-        def get_downstream_node(node_id, output_port):
+        # Helper to find all downstream nodes for a given node and output port
+        def get_downstream_nodes(node_id, output_port):
+            downstream = []
             for conn in self.connections.values():
                 if conn.source_node_id == node_id and conn.source_port == output_port:
-                    return self.nodes.get(conn.target_node_id), conn.target_port
-            return None, None
+                    downstream.append((self.nodes.get(conn.target_node_id), conn.target_port))
+            return downstream
 
         def can_execute_node(node: ProcessNode) -> bool:
             return node.can_execute() and node.id not in executed
+
+        # Recursive execution for downstream nodes
+        def execute_downstream(node, input_name, input_value):
+            if node is None:
+                return
+            node.set_input_value(input_name, input_value)
+            node.process()
+            results[node.id] = {
+                'success': True,
+                'outputs': {name: port.value for name, port in node.output_ports.items()}
+            }
+            print(f"Executed {node.name} ({node.id}) with input {input_name} = {input_value} {[node.get_output_value(out_name) for out_name in node.output_ports]}")
+            # For each output port, execute all downstream nodes recursively
+            for out_name in node.output_ports:
+                for next_node, next_input in get_downstream_nodes(node.id, out_name):
+                    execute_downstream(next_node, next_input, node.get_output_value(out_name))
 
         while len(executed) < len(self.nodes):
             executed_this_round = False
@@ -333,31 +352,23 @@ class Pipeline:
                     continueLoop = True
                     exitLoop = False
                     index = 0
-                    iterate_node, iterate_port = get_downstream_node(node_id, "iterate")
-                    while (continueLoop):
+                    while continueLoop:
                         result = node.process(index)
                         index += 1
                         continueLoop = result.get("continueLoop")
                         exitLoop = result.get("exitLoop")
                         item = node.get_output_value("iterate")
-                        if iterate_node and continueLoop:
-                            iterate_node.set_input_value("item", item)
-                            iterate_node.process()
-                            results[iterate_node.id] = {
+                        # Recursively execute all downstream nodes from 'iterate'
+                        for iterate_node, iterate_port in get_downstream_nodes(node_id, "iterate"):
+                            execute_downstream(iterate_node, iterate_port, item)
+                    # After loop, execute downstream node(s) for 'exit'
+                    for exit_node, exit_port in get_downstream_nodes(node_id, "exit"):
+                        if exit_node and exitLoop:
+                            exit_node.process()
+                            results[exit_node.id] = {
                                 'success': True,
-                                'outputs': {name: port.value for name, port in iterate_node.output_ports.items()}
+                                'outputs': {name: port.value for name, port in exit_node.output_ports.items()}
                             }
-                    # Find downstream node for 'iterate'
-                    # For each item, set input and execute downstream node
-                    
-                    # After loop, execute downstream node for 'exit'
-                    exit_node, exit_port = get_downstream_node(node_id, "exit")
-                    if exit_node and exitLoop:
-                        exit_node.process()
-                        results[exit_node.id] = {
-                            'success': True,
-                            'outputs': {name: port.value for name, port in exit_node.output_ports.items()}
-                        }
                     executed.add(node_id)
                     results[node_id] = {
                         'success': True,

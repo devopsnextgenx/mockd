@@ -1,0 +1,80 @@
+{
+  "name": "My Pipeline",
+  "nodes": [
+    {
+      "id": "0bffbd12-3178-4de1-b410-1e683f1d7fff",
+      "type": "array",
+      "name": "array",
+      "position": [
+        -217.0,
+        -158.0
+      ]
+    },
+    {
+      "id": "e847ae32-8096-405c-886c-2723426a296f",
+      "type": "forEach",
+      "name": "forEach",
+      "position": [
+        81.0,
+        -77.0
+      ]
+    },
+    {
+      "id": "efaa120d-4a62-4b10-bfb6-2f5b369e08db",
+      "type": "power",
+      "name": "Math (power)",
+      "position": [
+        367.0,
+        52.0
+      ]
+    },
+    {
+      "id": "3b6940f1-2e0c-4f7a-a9e6-ed22c1f805a5",
+      "type": "data",
+      "name": "data",
+      "position": [
+        -95.0,
+        198.0
+      ]
+    },
+    {
+      "id": "909ea502-f667-4466-adc6-806d000426a0",
+      "type": "print",
+      "name": "Print",
+      "position": [
+        660.0,
+        48.0
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "7377adac-707e-4e16-90b4-924eb59b1581",
+      "source_node": "0bffbd12-3178-4de1-b410-1e683f1d7fff",
+      "source_port": "output",
+      "target_node": "e847ae32-8096-405c-886c-2723426a296f",
+      "target_port": "items"
+    },
+    {
+      "id": "6d6e6bcd-af2e-42c4-919c-ef64d1cccc92",
+      "source_node": "3b6940f1-2e0c-4f7a-a9e6-ed22c1f805a5",
+      "source_port": "output",
+      "target_node": "efaa120d-4a62-4b10-bfb6-2f5b369e08db",
+      "target_port": "b"
+    },
+    {
+      "id": "794e57fb-07cf-43a7-8b98-2a51ab1e7e06",
+      "source_node": "e847ae32-8096-405c-886c-2723426a296f",
+      "source_port": "iterate",
+      "target_node": "efaa120d-4a62-4b10-bfb6-2f5b369e08db",
+      "target_port": "a"
+    },
+    {
+      "id": "d057534a-2e55-4243-b69f-245f8eef3f54",
+      "source_node": "efaa120d-4a62-4b10-bfb6-2f5b369e08db",
+      "source_port": "result",
+      "target_node": "909ea502-f667-4466-adc6-806d000426a0",
+      "target_port": "data"
+    }
+  ]
+}

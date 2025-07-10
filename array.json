@@ -1,0 +1,18 @@
+{
+  "name": "My Pipeline",
+  "nodes": [
+    {
+      "id": "31a65072-78d4-44bd-8b4e-7026dd083cb4",
+      "type": "array",
+      "name": "array",
+      "position": [
+        -128.0,
+        -134.0
+      ],
+      "input_values": {
+        "input": "[1, 2, 3]"
+      }
+    }
+  ],
+  "connections": []
+}

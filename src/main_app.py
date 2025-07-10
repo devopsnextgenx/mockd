@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction, QKeySequence
 import json
 import sys
 import os
+import traceback
 
 from src.core import Pipeline, DataNode
 from src.gui import NodeGraphScene, NodeGraphView, NodePalette, PropertyPanel
@@ -351,49 +352,67 @@ class NodeGraphEditor(QMainWindow):
     
     def load_pipeline(self, file_path: str):
         """Load pipeline from JSON file"""
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        
-        # Clear current pipeline
-        self.scene.clear()
-        self.pipeline = Pipeline(data.get('name', 'Loaded Pipeline'))
-        self.scene.pipeline = self.pipeline
-        self.scene.node_widgets.clear()
-        self.scene.connection_widgets.clear()
-        
-        # Load nodes
-        nodes_data = data.get('nodes', [])
-        node_id_mapping = {}  # Map old IDs to new IDs
-        
-        for node_data in nodes_data:
-            node_type = node_data.get('type', 'data')
-            position = tuple(node_data.get('position', [0, 0]))
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
             
-            new_node_id = self.scene.add_node(node_type, position)
-            if new_node_id:
-                old_id = node_data.get('id')
-                node_id_mapping[old_id] = new_node_id
-                
-                # Set node properties
-                node = self.pipeline.nodes[new_node_id]
-                if hasattr(node, 'set_data') and 'data' in node_data:
-                    node.set_data(node_data['data'])
-        
-        # Load connections
-        connections_data = data.get('connections', [])
-        for conn_data in connections_data:
-            old_source_id = conn_data.get('source_node')
-            old_target_id = conn_data.get('target_node')
+            # Clear current pipeline
+            self.scene.clear()
+            self.pipeline = Pipeline(data.get('name', 'Loaded Pipeline'))
+            self.scene.pipeline = self.pipeline
+            self.scene.node_widgets.clear()
+            self.scene.connection_widgets.clear()
             
-            if old_source_id in node_id_mapping and old_target_id in node_id_mapping:
-                new_source_id = node_id_mapping[old_source_id]
-                new_target_id = node_id_mapping[old_target_id]
+            # Load nodes
+            nodes_data = data.get('nodes', [])
+            node_id_mapping = {}  # Map old IDs to new IDs
+            
+            for node_data in nodes_data:
+                node_type = node_data.get('type', 'data')
+                position = tuple(node_data.get('position', [0, 0]))
                 
-                self.pipeline.connect_nodes(
-                    new_source_id, conn_data.get('source_port', ''),
-                    new_target_id, conn_data.get('target_port', '')
-                )
-    
+                new_node_id = self.scene.add_node(node_type, position)
+                if new_node_id:
+                    old_id = node_data.get('id')
+                    node_id_mapping[old_id] = new_node_id
+                    
+                    # Set node properties
+                    node = self.pipeline.nodes[new_node_id]
+                    if hasattr(node, 'set_data') and 'data' in node_data:
+                        node.set_data(node_data['data'])
+
+                    # Restore input port values if present
+                    if 'input_values' in node_data and hasattr(node, 'input_ports'):
+                        for port, value in node_data['input_values'].items():
+                            if port in node.input_ports:
+                                port_obj = node.input_ports[port]
+                                if hasattr(port_obj, 'value'):
+                                    port_obj.value = value
+            
+            # Load connections
+            connections_data = data.get('connections', [])
+            for conn_data in connections_data:
+                old_source_id = conn_data.get('source_node')
+                old_target_id = conn_data.get('target_node')
+                
+                if old_source_id in node_id_mapping and old_target_id in node_id_mapping:
+                    new_source_id = node_id_mapping[old_source_id]
+                    new_target_id = node_id_mapping[old_target_id]
+                    
+                    self.pipeline.connect_nodes(
+                        new_source_id, conn_data.get('source_port', ''),
+                        new_target_id, conn_data.get('target_port', '')
+                    )
+                    # Add this line to update the scene visually
+                    self.scene.add_connection(
+                        new_source_id, conn_data.get('source_port', ''),
+                        new_target_id, conn_data.get('target_port', '')
+                    )
+        except Exception as e:
+            print("Exception occurred during load_pipeline:")
+            traceback.print_exc()
+            QMessageBox.critical(self, "Error", f"Failed to load pipeline:\n{e}")
+
     def save_pipeline_to_file(self, file_path: str):
         """Save pipeline to JSON file"""
         # Prepare data structure
@@ -402,22 +421,37 @@ class NodeGraphEditor(QMainWindow):
             'nodes': [],
             'connections': []
         }
-        
+
+        # Defensive: Ensure nodes and connections exist
+        if not hasattr(self.pipeline, "nodes"):
+            self.pipeline.nodes = {}
+        if not hasattr(self.pipeline, "connections"):
+            self.pipeline.connections = {}
+
         # Save nodes
         for node_id, node in self.pipeline.nodes.items():
             node_data = {
                 'id': node_id,
-                'type': type(node).__name__.lower().replace('node', ''),
+                'type': getattr(node, 'type', type(node).__name__.lower().replace('node', '')),
                 'name': node.name,
                 'position': list(node.position)
             }
-            
+
             # Save special properties
             if hasattr(node, 'data'):
                 node_data['data'] = node.data
-            
+
+            # Always save input port values (including defaults)
+            if hasattr(node, 'input_ports'):
+                for port_name, port in node.input_ports.items():
+                    if hasattr(port, 'value'):
+                        node_data.setdefault('input_values', {})[port_name] = port.value
+                    else:
+                        # If no value, use default or empty
+                        node_data.setdefault('input_values', {})[port_name] = port.default_value if hasattr(port, 'default_value') else None
+
             data['nodes'].append(node_data)
-        
+
         # Save connections
         for conn_id, conn in self.pipeline.connections.items():
             conn_data = {
@@ -428,7 +462,7 @@ class NodeGraphEditor(QMainWindow):
                 'target_port': conn.target_port
             }
             data['connections'].append(conn_data)
-        
+
         # Write to file
         with open(file_path, 'w') as f:
             json.dump(data, f, indent=2)

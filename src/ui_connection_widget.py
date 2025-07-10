@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PySide6.QtCore import QPointF, QRectF, Qt
 from typing import Optional
+import uuid
 
 # NOTE: To ensure delete key works, NodeGraphScene must import ConnectionWidget from ui_connection_widget.py
 # In your gui.py, at the top, add:
@@ -13,6 +14,7 @@ class ConnectionWidget(QGraphicsItem):
     """Visual representation of a connection between ports"""
     def __init__(self, source_port, target_port=None):
         super().__init__()
+        self.id = str(uuid.uuid4())  # <-- Add this line
         self.source_port = source_port
         self.target_port = target_port
         self.temp_end_point = None

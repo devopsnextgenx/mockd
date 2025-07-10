@@ -318,6 +318,38 @@ class NodeGraphScene(QGraphicsScene):
             QMessageBox.critical(None, "Error", f"Failed to create custom node: {e}")
             import traceback
             traceback.print_exc()
+    
+    def add_connection(self, source_node_id, source_port_id, target_node_id, target_port_id):
+        """
+        Visually add a connection between two nodes in the scene.
+        """
+        # Find the node widgets by their IDs
+        source_widget = self.node_widgets.get(source_node_id)
+        target_widget = self.node_widgets.get(target_node_id)
+        if not source_widget or not target_widget:
+            return None
+
+        # Create the connection widget (adjust to your actual connection widget class)
+        source_port = self.get_port_by_id(source_node_id, source_port_id)  # or however you retrieve the port object
+        target_port = self.get_port_by_id(target_node_id, target_port_id, is_output=False)
+        connection = ConnectionWidget(source_port, target_port)
+        self.addItem(connection)
+        self.connection_widgets[connection.id] = connection
+        return connection
+
+    def get_port_by_id(self, node_id, port_name, is_output=True):
+        """
+        Return the port object for a given node_id and port_name.
+        Set is_output=False for input ports.
+        """
+        node_widget = self.node_widgets.get(node_id)
+        if not node_widget:
+            return None
+        ports = node_widget.output_ports if is_output else node_widget.input_ports
+        for port in ports.values():  # <-- FIX: iterate over values, not keys
+            if port.name == port_name:
+                return port
+        return None
 
 
 class NodeGraphView(QGraphicsView):
@@ -428,7 +460,7 @@ class NodePalette(QWidget):
         categories = {
             "Data": ["data", "array", "true", "false"],
             "Math": {
-                "math": ["math_add", "math_subtract", "math_multiply", "math_divide"],
+                "math": ["add", "subtract", "multiply", "divide", "power", "modulo"],
                 "Transform": ["transform_square", "transform_sqrt", "transform_abs", "transform_normalize"],
                 "Aggregate": ["aggregate_sum", "aggregate_mean", "aggregate_min", "aggregate_max"],
             },

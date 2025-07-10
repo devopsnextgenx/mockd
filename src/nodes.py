@@ -4,17 +4,17 @@ Built-in process nodes for common data operations
 import pandas as pd
 import numpy as np
 from typing import Any, List, Dict
-from src.core import TrueNode, ProcessNode, ArrayDataNode, DataNode, TrueNode, FalseNode, JsonDefinedNode, load_custom_node_definitions
+from src.core import TrueNode, ProcessNode, ArrayNode, DataNode, TrueNode, FalseNode, JsonDefinedNode, load_custom_node_definitions
 
 from mimesis import Generic, Person, Text, Numeric, Datetime, Address, Internet, Development
 
 
 class MathNode(ProcessNode):
     """Performs basic mathematical operations"""
-    
     def __init__(self, operation: str = "add"):
         super().__init__(f"Math ({operation})")
         self.operation = operation
+        self.type = operation  # Explicitly set type to match factory key
         self.add_input_port("a", (int, float))
         self.add_input_port("b", (int, float))
         self.add_output_port("result", (int, float))
@@ -48,11 +48,11 @@ class MathNode(ProcessNode):
 
 class FilterNode(ProcessNode):
     """Filters data based on conditions"""
-    
     def __init__(self):
         super().__init__("Filter")
+        self.type = "filter"
         self.add_input_port("data", List)
-        self.add_input_port("condition", Any)  # Can be string or callable
+        self.add_input_port("condition", Any)
         self.add_output_port("filtered_data", List)
     
     def process(self) -> bool:
@@ -90,10 +90,10 @@ class FilterNode(ProcessNode):
 
 class TransformNode(ProcessNode):
     """Transforms data using various operations"""
-    
     def __init__(self, transform_type: str = "none"):
         super().__init__(f"Transform ({transform_type})")
         self.transform_type = transform_type
+        self.type = f"transform_{transform_type}"
         self.add_input_port("data", List)
         self.add_output_port("transformed_data", List)
         self.properties = {"transform_type": transform_type}  # Add properties for TransformNode
@@ -132,10 +132,10 @@ class TransformNode(ProcessNode):
 
 class AggregateNode(ProcessNode):
     """Aggregates data using various statistical operations"""
-    
     def __init__(self, operation: str = "sum"):
         super().__init__(f"Aggregate ({operation})")
         self.operation = operation
+        self.type = f"aggregate_{operation}"
         self.add_input_port("data", List)
         self.add_output_port("result", (int, float))
         self.properties = {"operation": operation}  # Add properties for AggregateNode
@@ -175,9 +175,9 @@ class AggregateNode(ProcessNode):
 
 class JoinNode(ProcessNode):
     """Joins multiple data streams"""
-    
     def __init__(self):
         super().__init__("Join")
+        self.type = "join"
         self.add_input_port("data1", List)
         self.add_input_port("data2", List)
         self.add_output_port("joined_data", List)
@@ -196,9 +196,9 @@ class JoinNode(ProcessNode):
 
 class SplitNode(ProcessNode):
     """Splits data into multiple streams"""
-    
     def __init__(self):
         super().__init__("Split")
+        self.type = "split"
         self.add_input_port("data", List)
         self.add_input_port("split_index", int)
         self.add_output_port("data1", List)
@@ -224,9 +224,9 @@ class SplitNode(ProcessNode):
 
 class PrintNode(ProcessNode):
     """Prints data to console (useful for debugging)"""
-    
     def __init__(self):
         super().__init__("Print")
+        self.type = "print"
         self.add_input_port("data", Any)
         self.add_output_port("data", Any)  # Pass-through
     
@@ -242,10 +242,10 @@ class PrintNode(ProcessNode):
 
 class MockNode(ProcessNode):
     """Generates mock data using Mimesis library"""
-    
-    def __init__(self, data_type: str = "text", size: int = 10, min_length: int = None, max_length: int = None):
+    def __init__(self, data_type: str = "text", size: int = 10, min_length: int = 10, max_length: int = 25):
         super().__init__(f"Mock ({data_type})")
         self.data_type = data_type
+        self.type = f"mock_{data_type}" if data_type else "mock"
         self.size = size
         self.min_length = min_length
         self.max_length = max_length
@@ -265,6 +265,7 @@ class MockNode(ProcessNode):
             "min_length": min_length if min_length is not None else '',
             "max_length": max_length if max_length is not None else ''
         }
+        self.data_changed.emit()
     
     def process(self) -> bool:
         try:
@@ -413,6 +414,7 @@ class ForEachNode(ProcessNode):
     """
     def __init__(self, name: str = "forEach"):
         super().__init__(name)
+        self.type = "forEach"
         self.add_input_port("items", list)
         self.add_output_port("iterate", Any)  # Used to trigger downstream node for each item
         self.add_output_port("exit", Any)     # Used to trigger downstream node after loop
@@ -438,12 +440,14 @@ NODE_TYPES = {
     "true": lambda: TrueNode("True"),
     "false": lambda: FalseNode("False"),
     "data": lambda: DataNode("data"),
-    "array": lambda: ArrayDataNode("array"),
+    "array": lambda: ArrayNode("array"),
     "forEach": lambda: ForEachNode("forEach"),
-    "math_add": lambda: MathNode("add"),
-    "math_subtract": lambda: MathNode("subtract"),
-    "math_multiply": lambda: MathNode("multiply"),
-    "math_divide": lambda: MathNode("divide"),
+    "add": lambda: MathNode("add"),
+    "subtract": lambda: MathNode("subtract"),
+    "multiply": lambda: MathNode("multiply"),
+    "divide": lambda: MathNode("divide"),
+    "power": lambda: MathNode("power"),
+    "modulo": lambda: MathNode("modulo"),
     "filter": lambda: FilterNode(),
     "transform_square": lambda: TransformNode("square"),
     "transform_sqrt": lambda: TransformNode("sqrt"),
