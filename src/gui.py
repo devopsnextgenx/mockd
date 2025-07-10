@@ -433,7 +433,7 @@ class NodePalette(QWidget):
                 "Aggregate": ["aggregate_sum", "aggregate_mean", "aggregate_min", "aggregate_max"],
             },
             "Utility": {
-                "Filter": ["filter", "join", "split", "print"],
+                "Filter": ["forEach", "filter", "join", "split", "print"],
             },
             "Mock Data": {
                 "Basic": [

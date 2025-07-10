@@ -406,13 +406,53 @@ class MockNode(ProcessNode):
         """MockNode can always execute as it has default values for all inputs"""
         return True
 
+class ForEachNode(ProcessNode):
+    """Loops over an array input, invoking a body node for each item, then a finalizer node."""
+    def __init__(self, name: str = "forEach"):
+        super().__init__(name)
+        self.add_input_port("items", list)
+        self.add_input_port("body_node", Any)        # Should be a ProcessNode or node id
+        self.add_input_port("finalizer_node", Any)   # Should be a ProcessNode or node id
+        self.add_output_port("results", list)
+        self.properties = {}
+
+    def process(self) -> bool:
+        items = self.get_input_value("items")
+        body_node = self.get_input_value("body_node")
+        finalizer_node = self.get_input_value("finalizer_node")
+        results = []
+
+        if not isinstance(items, list) or body_node is None:
+            self.set_output_value("results", [])
+            return False
+
+        # Loop over items and invoke body_node for each
+        for item in items:
+            # Set input for body_node and process
+            if hasattr(body_node, "set_input_value") and hasattr(body_node, "process"):
+                body_node.set_input_value("item", item)
+                if body_node.process():
+                    results.append(body_node.get_output_value("result"))
+                else:
+                    results.append(None)
+            else:
+                results.append(None)
+
+        # Optionally invoke finalizer_node after loop
+        if finalizer_node and hasattr(finalizer_node, "set_input_value") and hasattr(finalizer_node, "process"):
+            finalizer_node.set_input_value("results", results)
+            finalizer_node.process()
+
+        self.set_output_value("results", results)
+        return True
 
 # Node factory for easy node creation
 NODE_TYPES = {
     "true": lambda: TrueNode("True"),
     "false": lambda: FalseNode("False"),
-    "array": lambda: ArrayDataNode("array"),
     "data": lambda: DataNode("data"),
+    "array": lambda: ArrayDataNode("array"),
+    "forEach": lambda: ForEachNode("forEach"),
     "math_add": lambda: MathNode("add"),
     "math_subtract": lambda: MathNode("subtract"),
     "math_multiply": lambda: MathNode("multiply"),
